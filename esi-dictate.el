@@ -39,6 +39,10 @@
   "API Key for Deepgram."
   :type 'string)
 
+(defcustom esi-dictate-dg-language "en-IN"
+  "Language to use for ASR."
+  :type 'string)
+
 (defcustom esi-dictate-llm-provider nil
   "LLM provider to use for corrections")
 
@@ -189,6 +193,7 @@ semantics of intermittent results."
 (defun esi-dictate-filter-fn (process string)
   "Filter function to read the output from python script that
  interacts with Deeepgram."
+  ;; (message "ESI: %s" string)
   (let ((existing (or (process-get process 'accumulated-output) "")))
     (setq existing (concat existing string))
     (while (string-match "\n" existing)
@@ -210,20 +215,33 @@ current region."
   (esi-dictate-clear-context-overlay)
   (setq esi-dictate-context-overlay (esi-dictate-make-context-overlay)))
 
+(defun esi-dictate-choose-language (lang)
+  ""
+  (interactive (list (completing-read "Choose language: " '("en-IN" "de"))))
+  (setq esi-dictate-dg-language lang))
+
 ;;;###autoload
-(defun esi-dictate-start ()
+(defun esi-dictate-start (arg)
   "Start the real-time transcription process to start inserting text
 in current buffer."
-  (interactive)
-  (esi-dictate--clear-process)
-  (setq esi-dictate--dg-process
-        (let ((process-environment (cons (format "DG_API_KEY=%s" esi-dictate-dg-api-key) process-environment)))
-          (make-process :name "esi-dictate-dg"
-                        :buffer "*esi-dictate-dg*"
-                        :command (list "dg.py")
-                        :filter #'esi-dictate-filter-fn)))
-  (esi-dictate-mode)
-  (message "[esi] Starting dictation mode ..."))
+  (interactive "P")
+  (if arg
+      (call-interactively #'esi-dictate-choose-language)
+    (esi-dictate--clear-process)
+    (setq esi-dictate--dg-process
+          (let ((process-environment (cons
+                                      (format "DG_LANGUAGE=%s" esi-dictate-dg-language)
+                                      (cons
+                                       (format "DG_API_KEY=%s" esi-dictate-dg-api-key)
+                                       process-environment)))
+                (default-directory (file-name-parent-directory (find-library-name "esi-dictate"))))
+            (make-process :name "esi-dictate-dg"
+                          :buffer "*esi-dictate-dg*"
+                          :command (list "nix" "develop" "-c" "python" "dg.py")
+                          :filter #'esi-dictate-filter-fn)))
+    (display-buffer (process-buffer esi-dictate--dg-process) t)
+    (esi-dictate-mode)
+    (message "[esi] Starting dictation mode ...")))
 
 (defun esi-dictate-stop ()
   (interactive)

@@ -33,6 +33,8 @@ def main():
             os.getenv("DG_API_KEY")
         )
 
+        language = os.getenv("DG_LANGUAGE", "en-IN")
+
         dg_connection = deepgram.listen.live.v("1")
 
         dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
@@ -44,7 +46,7 @@ def main():
         options = LiveOptions(
             model="nova-2",
             punctuate=True,
-            language="en-IN",
+            language=language,
             encoding="linear16",
             channels=1,
             sample_rate=16000,
