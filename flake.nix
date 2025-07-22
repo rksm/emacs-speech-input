@@ -7,42 +7,43 @@
   outputs =
     { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-        pythonPackages = pkgs.python312Packages;
-        python = pkgs.python312;
-      in
-        {
+    let
+      pkgs = import nixpkgs { inherit system; };
+      pythonPackages = pkgs.python312Packages;
+      python = pkgs.python312;
+    in
+    {
 
-          devShells.default = pkgs.mkShell {
-            packages = with pkgs; [
-              python
-              zlib
-            ];
+      devShells.default = pkgs.mkShell {
+        packages = with pkgs; [
+          python
+          zlib
+          jack2
+        ];
 
-            nativeBuildInputs = with pkgs; [
-              pythonPackages.venvShellHook
-              emacs-nox
-              libsndfile
-              libsoundio
-              fftw
-              blas
-              portaudio
-              pkg-config
-            ];
+        nativeBuildInputs = with pkgs; [
+          pythonPackages.venvShellHook
+          emacs-nox
+          libsndfile
+          libsoundio
+          fftw
+          blas
+          portaudio
+          pkg-config
+        ];
 
-            venvDir = ".venv";
+        venvDir = ".venv";
 
-            postVenvCreation = ''
-            unset SOURCE_DATE_EPOCH
-            pip install -r requirements.txt
-          '';
+        postVenvCreation = ''
+          unset SOURCE_DATE_EPOCH
+          pip install -r requirements.txt
+        '';
 
-            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
-              pkgs.zlib
-              pkgs.stdenv.cc.cc
-            ];
-          };
-        }
+        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+          pkgs.zlib
+          pkgs.stdenv.cc.cc
+        ];
+      };
+    }
     );
 }
