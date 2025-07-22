@@ -57,3 +57,4 @@
 /.envrc
 /.direnv/
 /.venv/
+/.env

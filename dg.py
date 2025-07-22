@@ -2,6 +2,9 @@
 
 import os
 
+# Use PulseAudio/PipeWire for audio
+os.environ['PULSE_LATENCY_MSEC'] = '30'
+
 from deepgram import (DeepgramClient, LiveOptions, LiveTranscriptionEvents,
                       Microphone)
 
@@ -56,7 +59,8 @@ def main():
             vad_events=True,
         )
         dg_connection.start(options)
-        microphone = Microphone(dg_connection.send)
+        # Use default audio device (usually PulseAudio/PipeWire)
+        microphone = Microphone(dg_connection.send, input_device_index=None)
 
         microphone.start()
         input("Press Enter to stop recording...\n\n")
