@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env -S nix develop /home/robert/projects/ai/transcription/emacs-speech-input -c python
 
 import os
 
