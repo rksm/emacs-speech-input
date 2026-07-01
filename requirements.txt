@@ -1,2 +1,2 @@
-deepgram-sdk
-pyaudio
+deepgram-sdk>=7.4,<8
+pyaudio>=0.2.14

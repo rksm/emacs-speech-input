@@ -1,9 +1,13 @@
 .PHONY: test clean
 
+EMACS ?= emacs
+EMACS_MODULE_INCLUDE ?= $(shell $(EMACS) --batch -Q --eval "(princ (expand-file-name \"../include\" invocation-directory))")
+CFLAGS += -I$(EMACS_MODULE_INCLUDE)
+
 all: esi-core.so
 
 test: tests/test-prep
-	cask exec buttercup -L .
+	$(EMACS) --batch -Q -L . -L tests --eval "(require 'buttercup)" -f buttercup-run-discover tests
 	tests/test-prep
 	touch tests/test-prep.c
 
@@ -18,7 +22,7 @@ clean:
 	rm -f esi-core.so esi-embed-core.so src/embed/esi-embed.o
 
 tests/test-prep: tests/test-prep.c esi-core.so
-	gcc -lcmocka $(LIBS) -I ./src/ tests/test-prep.c -o $@
+	gcc $(CFLAGS) -lcmocka $(LIBS) -I ./src/ tests/test-prep.c -o $@
 
 esi-core.so: $(wildcard src/*.c) $(wildcard src/*.h)
-	gcc $(LIBS) -fPIC -pthread -shared $(wildcard src/*.c) -o $@
+	gcc $(CFLAGS) $(LIBS) -fPIC -pthread -shared $(wildcard src/*.c) -o $@

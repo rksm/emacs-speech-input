@@ -15,10 +15,19 @@ static emacs_value Fesi_core_version(emacs_env *env, ptrdiff_t n, emacs_value ar
   return env->make_string(env, esi_core_version, strlen(esi_core_version));
 }
 
-static emacs_value make_vector(emacs_env *env, int len, double init) {
+static emacs_value make_vector(emacs_env *env, ptrdiff_t len, double init) {
   emacs_value Fmake_vector = env->intern(env, "make-vector");
   emacs_value args[] = { env->make_integer(env, len), env->make_float(env, init) };
   return env->funcall(env, Fmake_vector, 2, args);
+}
+
+static emacs_value signal_error(emacs_env *env, const char *message) {
+  emacs_value Qerror = env->intern(env, "error");
+  emacs_value Qlist = env->intern(env, "list");
+  emacs_value msg = env->make_string(env, message, strlen(message));
+  emacs_value data = env->funcall(env, Qlist, 1, &msg);
+  env->non_local_exit_signal(env, Qerror, data);
+  return env->intern(env, "nil");
 }
 
 // Return an elisp matrix from a given row major float matrix
@@ -37,13 +46,25 @@ emacs_value make_matrix(emacs_env *env, double* matrix, size_t n_rows, size_t n_
 }
 
 static emacs_value Fwav_to_samples(emacs_env *env, ptrdiff_t n, emacs_value args[], void *data) {
-  ptrdiff_t buffer_size;
-  env->copy_string_contents(env, args[0], NULL, &buffer_size);
+  emacs_value Fstring_as_unibyte = env->intern(env, "string-as-unibyte");
+  emacs_value raw_string = env->funcall(env, Fstring_as_unibyte, 1, args);
+  if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
+    return env->intern(env, "nil");
+
+  ptrdiff_t buffer_size = 0;
+  if (!env->copy_string_contents(env, raw_string, NULL, &buffer_size) || buffer_size <= 0)
+    return signal_error(env, "Could not copy WAV bytes from Emacs string");
 
   char *buffer = malloc(buffer_size);
-  env->copy_string_contents(env, args[0], buffer, &buffer_size);
+  if (!buffer)
+    return signal_error(env, "Could not allocate WAV byte buffer");
 
-  sf_count_t n_samples;
+  if (!env->copy_string_contents(env, raw_string, buffer, &buffer_size)) {
+    free(buffer);
+    return signal_error(env, "Could not copy WAV bytes into C buffer");
+  }
+
+  size_t n_samples;
   double *samples = samples_from_buffer(buffer, buffer_size, &n_samples);
 
   emacs_value vector = make_vector(env, n_samples, 0);
@@ -216,7 +237,9 @@ static emacs_value Fread_background_recording_buffer(emacs_env *env, ptrdiff_t n
   size_t output_size;
   char* output = read_background_recording(instream, &output_size);
 
-  return env->make_string(env, output, output_size);
+  emacs_value output_string = env->make_unibyte_string(env, output, output_size);
+  free(output);
+  return output_string;
 }
 
 // Stop the ongoing recording altogether and return buffer

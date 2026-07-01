@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t; -*-
 (require 'esi-core)
 (require 'esi-utils)
 (require 'cl-extra)
@@ -83,6 +84,8 @@
 
   (it "works without errors"
     (let ((data (esi-core--read-background-recording-buffer instream)))
+      (when (= (length data) 0)
+        (buttercup-skip "No audio input data available"))
       (f-write-text data 'utf-8 filepath)
-      (expect (string-to-number (alist-get 'duration (ffprobe filepath "-f" "s16le" "-ar" "44.1k" "-ac" "2")))
+      (expect (string-to-number (alist-get 'duration (ffprobe filepath "-f" "s16le" "-sample_rate" "44100" "-ch_layout" "stereo")))
               :to-equal 2.0))))

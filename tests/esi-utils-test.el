@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 (require 'esi-utils)
 
 (describe "Vector"

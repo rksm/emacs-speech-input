@@ -11,6 +11,13 @@
       pkgs = import nixpkgs { inherit system; };
       pythonPackages = pkgs.python312Packages;
       python = pkgs.python312;
+      emacs = (pkgs.emacsPackagesFor pkgs.emacs-nox).emacsWithPackages (epkgs: with epkgs; [
+        buttercup
+        dash
+        f
+        llm
+        s
+      ]);
     in
     {
 
@@ -23,11 +30,13 @@
 
         nativeBuildInputs = with pkgs; [
           pythonPackages.venvShellHook
-          emacs-nox
+          emacs
           libsndfile
           libsoundio
           fftw
           blas
+          cmocka
+          ffmpeg-headless
           portaudio
           pkg-config
         ];

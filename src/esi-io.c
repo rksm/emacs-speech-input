@@ -22,32 +22,43 @@ sf_count_t vfget_filelen(void *user_data) {
 
 sf_count_t vfseek(sf_count_t offset, int whence, void *user_data) {
   VIO_DATA *vf = (VIO_DATA *)user_data;
+  sf_count_t new_offset;
 
   switch (whence) {
   case SEEK_SET:
-    vf->offset = offset;
+    new_offset = offset;
     break;
 
   case SEEK_CUR:
-    vf->offset = vf->offset + offset;
+    new_offset = vf->offset + offset;
     break;
 
   case SEEK_END:
-    vf->offset = vf->length + offset;
+    new_offset = vf->length + offset;
     break;
 
   default:
-    break;
+    return -1;
   };
 
+  if (new_offset < 0)
+    return -1;
+  if (new_offset > vf->length)
+    new_offset = vf->length;
+
+  vf->offset = new_offset;
   return vf->offset;
 }
 
 sf_count_t vfread(void *ptr, sf_count_t count, void *user_data) {
   VIO_DATA *vf = (VIO_DATA *)user_data;
 
-  if (vf->offset + count > vf->length)
-    count = vf->length - vf->offset;
+  if (count <= 0 || vf->offset < 0 || vf->offset >= vf->length)
+    return 0;
+
+  sf_count_t available = vf->length - vf->offset;
+  if (count > available)
+    count = available;
 
   memcpy(ptr, vf->data + vf->offset, count);
   vf->offset += count;
@@ -62,7 +73,7 @@ sf_count_t vftell(void *user_data) {
 
 double* samples_from_buffer(char* buffer, size_t buffer_size, size_t* n_samples) {
   VIO_DATA vio_data;
-  SF_VIRTUAL_IO vio;
+  SF_VIRTUAL_IO vio = {0};
 
   vio.get_filelen = vfget_filelen;
   vio.seek = vfseek;
@@ -70,26 +81,46 @@ double* samples_from_buffer(char* buffer, size_t buffer_size, size_t* n_samples)
   vio.tell = vftell;
 
   vio_data.offset = 0;
-  vio_data.length = buffer_size - 1;
+  vio_data.length = buffer_size > 0 ? buffer_size - 1 : 0;
   vio_data.data = buffer;
 
   SNDFILE *sfile;
-  SF_INFO file_info;
+  SF_INFO file_info = {0};
 
   sfile = sf_open_virtual(&vio, SFM_READ, &file_info, &vio_data);
+  if (!sfile || file_info.frames <= 0 || file_info.channels <= 0) {
+    *n_samples = 0;
+    return NULL;
+  }
 
-  sf_count_t frames_count = file_info.frames * file_info.channels;
-  double *frames = malloc(sizeof(double) * frames_count);
-  sf_readf_double(sfile, frames, frames_count);
+  sf_count_t frame_count = file_info.frames;
+  sf_count_t sample_count = frame_count * file_info.channels;
+  double *frames = malloc(sizeof(double) * sample_count);
+  if (!frames) {
+    sf_close(sfile);
+    *n_samples = 0;
+    return NULL;
+  }
+
+  sf_count_t frames_read = sf_readf_double(sfile, frames, frame_count);
+  if (frames_read < 0)
+    frames_read = 0;
 
   // KLUDGE: This is for picking up first channel data. There is too much
   //         copying happening overall.
-  double *samples = malloc(sizeof(double) * file_info.frames);
-  for (size_t i = 0; i < file_info.frames; i++) {
+  double *samples = malloc(sizeof(double) * frames_read);
+  if (!samples) {
+    sf_close(sfile);
+    free(frames);
+    *n_samples = 0;
+    return NULL;
+  }
+
+  for (size_t i = 0; i < frames_read; i++) {
     samples[i] = frames[i * file_info.channels];
   }
 
-  *n_samples = file_info.frames;
+  *n_samples = frames_read;
 
   sf_close(sfile);
   free(frames);
@@ -152,7 +183,7 @@ size_t chain_buffer_filled_length(struct chain_buffer* buffer) {
   struct chain_buffer* current = buffer;
   while (current) {
     length = length + current->length;
-    current = buffer->next;
+    current = current->next;
   }
 
   return length;

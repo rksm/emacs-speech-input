@@ -217,7 +217,7 @@ current region."
 
 (defun esi-dictate-choose-language (lang)
   ""
-  (interactive (list (completing-read "Choose language: " '("en-IN" "de"))))
+  (interactive (list (completing-read "Choose language: " '("en-IN" "multi" "de"))))
   (setq esi-dictate-dg-language lang))
 
 ;;;###autoload
